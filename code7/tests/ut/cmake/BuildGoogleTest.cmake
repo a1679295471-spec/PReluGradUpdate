@@ -21,6 +21,15 @@ endif()
 add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 
 set(GTEST_SOURCE_DIR "$ENV{GTEST_SOURCE_DIR}" CACHE PATH "GoogleTest source directory")
+if(NOT EXISTS "${GTEST_SOURCE_DIR}/CMakeLists.txt" AND EXISTS "/usr/src/googletest/CMakeLists.txt")
+    # Distribution source packages drop GoogleTest here (Ubuntu: libgtest-dev,
+    # openEuler: googletest-devel).  GoogleTest has to be compiled from source
+    # because the UT uses _GLIBCXX_USE_CXX11_ABI=0 to match CANN, while the
+    # prebuilt system libgtest.a is ABI=1 and would fail to link.
+    set(GTEST_SOURCE_DIR "/usr/src/googletest" CACHE PATH "GoogleTest source directory" FORCE)
+    message(STATUS "Using GoogleTest sources: ${GTEST_SOURCE_DIR}")
+endif()
+
 if(EXISTS "${GTEST_SOURCE_DIR}/CMakeLists.txt")
     add_subdirectory(${GTEST_SOURCE_DIR} ${CMAKE_BINARY_DIR}/gtest EXCLUDE_FROM_ALL)
 else()
