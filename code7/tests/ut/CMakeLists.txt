@@ -57,10 +57,6 @@ add_compile_options(
     -fno-access-control
 )
 
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug)
-endif()
-
 message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
 
 add_subdirectory(op_host)
