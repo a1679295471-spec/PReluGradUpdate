@@ -187,7 +187,7 @@ __aicore__ inline void PReluGradUpdate<T>::CopyIn(int64_t offset, int64_t count)
     LocalTensor<T> gradsLocal = inQueueGrads.AllocTensor<T>();
     LocalTensor<T> featuresLocal = inQueueFeatures.AllocTensor<T>();
 
-    DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * static_cast<int64_t>(sizeof(T))), 0, 0};
+    DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * static_cast<int64_t>(sizeof(T))), 0, 0, 0};
     DataCopyPadExtParams<T> padParams{false, 0, 0, static_cast<T>(0.0f)};
     DataCopyPad(gradsLocal, gradsGm[offset], copyParams, padParams);
     DataCopyPad(featuresLocal, featuresGm[offset], copyParams, padParams);
@@ -263,7 +263,7 @@ __aicore__ inline void PReluGradUpdate<T>::ComputeWithScalarWeight(int64_t count
     Muls(temp, selectMask, -1.0f, n);
     Adds(temp, temp, 1.0f, n);
     Muls(temp, temp, weight, n);
-    Adds(temp, temp, selectMask, n);
+    Add(temp, temp, selectMask, n);
 
     Mul(features32, features32, grads32, n);
     Mul(selectMask, selectMask, features32, n);
@@ -296,7 +296,7 @@ __aicore__ inline void PReluGradUpdate<T>::CopyOut(int64_t offset, int64_t count
     LocalTensor<T> dxLocal = outQueueDx.DeQue<T>();
     LocalTensor<T> updateLocal = outQueueUpdate.DeQue<T>();
 
-    DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * static_cast<int64_t>(sizeof(T))), 0, 0};
+    DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * static_cast<int64_t>(sizeof(T))), 0, 0, 0};
     DataCopyPad(dxGm[offset], dxLocal, copyParams);
     DataCopyPad(updateGm[offset], updateLocal, copyParams);
 
