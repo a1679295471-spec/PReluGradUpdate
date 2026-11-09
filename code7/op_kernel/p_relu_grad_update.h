@@ -51,6 +51,7 @@ private:
     __aicore__ inline void CopyIn(int64_t offset, int64_t count);
     __aicore__ inline void PrepareFloatInputs(int64_t count);
     __aicore__ inline void BuildPattern();
+    __aicore__ inline float LoadWeightScalar(int64_t index);
     __aicore__ inline void BuildWeightVector(int64_t count);
     __aicore__ inline void ComputeWithVectorWeight(int64_t count);
     __aicore__ inline void ComputeWithScalarWeight(int64_t count, float weight);
@@ -74,6 +75,9 @@ private:
     TBuf<QuePosition::VECCALC> selectBuf;
     TBuf<QuePosition::VECCALC> tempBuf;
     TBuf<QuePosition::VECCALC> weightBuf;
+    TBuf<QuePosition::VECCALC> weightInBuf;
+    TBuf<QuePosition::VECCALC> scalarInBuf;
+    TBuf<QuePosition::VECCALC> scalarFloatBuf;
     TBuf<QuePosition::VECCALC> patternBuf;
 
     GlobalTensor<T> gradsGm;
@@ -135,12 +139,25 @@ __aicore__ inline void PReluGradUpdate<T>::Init(GM_ADDR grads, GM_ADDR features,
     const int64_t tileBytesT = AlignUp(ubFactor * static_cast<int64_t>(sizeof(T)), UB_ALIGN_BYTES);
     const int64_t tileBytesF = AlignUp(ubFactor * static_cast<int64_t>(sizeof(float)), UB_ALIGN_BYTES);
 
+    // The float staging buffer is created first because BuildPattern() uses it
+    // on the bf16 path, where the [C] weights are widened by a vector Cast.
+    pipe.InitBuffer(weightBuf, tileBytesF);
+    weightVec = weightBuf.Get<float>();
+
     // Build the periodic weight table before any TQue is created, so the
-    // manual S->V event ids cannot collide with TPipe's queue events.
+    // manual event ids cannot collide with TPipe's queue events.
     if (usePattern) {
         pipe.InitBuffer(patternBuf, AlignUp(patternSize * static_cast<int64_t>(sizeof(float)), UB_ALIGN_BYTES));
         pattern = patternBuf.Get<float>();
+        if constexpr (IsSameType<T, bfloat16_t>::value) {
+            pipe.InitBuffer(weightInBuf, AlignUp(channelNum * static_cast<int64_t>(sizeof(T)), UB_ALIGN_BYTES));
+        }
         BuildPattern();
+    } else {
+        if constexpr (IsSameType<T, bfloat16_t>::value) {
+            pipe.InitBuffer(scalarInBuf, UB_ALIGN_BYTES * 8);
+            pipe.InitBuffer(scalarFloatBuf, UB_ALIGN_BYTES * 8);
+        }
     }
 
     pipe.InitBuffer(inQueueGrads, BUFFER_NUM, tileBytesT);
@@ -151,13 +168,11 @@ __aicore__ inline void PReluGradUpdate<T>::Init(GM_ADDR grads, GM_ADDR features,
     pipe.InitBuffer(features32Buf, tileBytesF);
     pipe.InitBuffer(selectBuf, tileBytesF);
     pipe.InitBuffer(tempBuf, tileBytesF);
-    pipe.InitBuffer(weightBuf, tileBytesF);
 
     grads32 = grads32Buf.Get<float>();
     features32 = features32Buf.Get<float>();
     selectMask = selectBuf.Get<float>();
     temp = tempBuf.Get<float>();
-    weightVec = weightBuf.Get<float>();
 }
 
 
@@ -166,10 +181,32 @@ __aicore__ inline void PReluGradUpdate<T>::BuildPattern()
 {
     const int64_t period = channelNum * innerSize;
     const int64_t repeat = patternSize / period;
+
+    // bf16 has no scalar conversion instruction on the AICore scalar unit, so
+    // static_cast<float>(GetValue()) makes bisheng fail with
+    // "not support bf16 type cast".  The weights are staged in UB and widened
+    // with the vector Cast instead.
+    if constexpr (IsSameType<T, bfloat16_t>::value) {
+        LocalTensor<T> weightIn = weightInBuf.Get<T>();
+        DataCopyExtParams weightParams{1, static_cast<uint32_t>(channelNum * static_cast<int64_t>(sizeof(T))), 0, 0, 0};
+        DataCopyPadExtParams<T> weightPad{false, 0, 0, T{}};
+        DataCopyPad(weightIn, weightsGm, weightParams, weightPad);
+        SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
+        Cast(weightVec, weightIn, RoundMode::CAST_NONE, static_cast<int32_t>(channelNum));
+        SetFlag<HardEvent::V_S>(EVENT_ID0);
+        WaitFlag<HardEvent::V_S>(EVENT_ID0);
+    }
+
     int64_t index = 0;
     for (int64_t r = 0; r < repeat; ++r) {
         for (int64_t c = 0; c < channelNum; ++c) {
-            const float value = static_cast<float>(weightsGm.GetValue(c));
+            float value = 0.0f;
+            if constexpr (IsSameType<T, bfloat16_t>::value) {
+                value = weightVec.GetValue(c);
+            } else {
+                value = static_cast<float>(weightsGm.GetValue(c));
+            }
             for (int64_t k = 0; k < innerSize; ++k) {
                 pattern.SetValue(index, value);
                 ++index;
@@ -182,13 +219,37 @@ __aicore__ inline void PReluGradUpdate<T>::BuildPattern()
 }
 
 template <typename T>
+__aicore__ inline float PReluGradUpdate<T>::LoadWeightScalar(int64_t index)
+{
+    if constexpr (IsSameType<T, float>::value) {
+        return weightsGm.GetValue(index);
+    } else if constexpr (IsSameType<T, half>::value) {
+        return static_cast<float>(weightsGm.GetValue(index));
+    } else {
+        // bf16 has to be widened on the vector unit: the scalar unit of the
+        // AICore has no float <-> bfloat16_t conversion instruction.
+        LocalTensor<T> weightIn = scalarInBuf.Get<T>();
+        LocalTensor<float> weightF = scalarFloatBuf.Get<float>();
+        DataCopyExtParams copyParams{1, static_cast<uint32_t>(sizeof(T)), 0, 0, 0};
+        DataCopyPadExtParams<T> padParams{false, 0, 0, T{}};
+        DataCopyPad(weightIn, weightsGm[index], copyParams, padParams);
+        SetFlag<HardEvent::MTE2_V>(EVENT_ID0);
+        WaitFlag<HardEvent::MTE2_V>(EVENT_ID0);
+        Cast(weightF, weightIn, RoundMode::CAST_NONE, static_cast<int32_t>(1));
+        SetFlag<HardEvent::V_S>(EVENT_ID0);
+        WaitFlag<HardEvent::V_S>(EVENT_ID0);
+        return weightF.GetValue(0);
+    }
+}
+
+template <typename T>
 __aicore__ inline void PReluGradUpdate<T>::CopyIn(int64_t offset, int64_t count)
 {
     LocalTensor<T> gradsLocal = inQueueGrads.AllocTensor<T>();
     LocalTensor<T> featuresLocal = inQueueFeatures.AllocTensor<T>();
 
     DataCopyExtParams copyParams{1, static_cast<uint32_t>(count * static_cast<int64_t>(sizeof(T))), 0, 0, 0};
-    DataCopyPadExtParams<T> padParams{false, 0, 0, static_cast<T>(0.0f)};
+    DataCopyPadExtParams<T> padParams{false, 0, 0, T{}};
     DataCopyPad(gradsLocal, gradsGm[offset], copyParams, padParams);
     DataCopyPad(featuresLocal, featuresGm[offset], copyParams, padParams);
 
@@ -331,7 +392,7 @@ __aicore__ inline void PReluGradUpdate<T>::Process()
         const int64_t channel = (offset / innerSize) % channelNum;
         const int64_t channelEnd = offset + innerSize - (offset % innerSize);
         const int64_t segmentEnd = channelEnd < end ? channelEnd : end;
-        const float weight = static_cast<float>(weightsGm.GetValue(channel));
+        const float weight = LoadWeightScalar(channel);
         while (offset < segmentEnd) {
             const int64_t count = (segmentEnd - offset) < ubFactor ? (segmentEnd - offset) : ubFactor;
             CopyIn(offset, count);
