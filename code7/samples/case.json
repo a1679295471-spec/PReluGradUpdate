@@ -1,0 +1,119 @@
+{
+  "source_case": "npu_cases[0]",
+  "function": "impl",
+  "attributes": {},
+  "inputs": [
+    {
+      "name": "grads",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "grads.bin",
+          "dtype": "float32",
+          "shape": [
+            4,
+            6,
+            8
+          ],
+          "bytes": 768,
+          "elements": 192,
+          "range": [
+            -5,
+            5
+          ],
+          "value": null,
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "features",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "features.bin",
+          "dtype": "float32",
+          "shape": [
+            4,
+            6,
+            8
+          ],
+          "bytes": 768,
+          "elements": 192,
+          "range": [
+            -5,
+            5
+          ],
+          "value": null,
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "weights",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "weights.bin",
+          "dtype": "float32",
+          "shape": [
+            6
+          ],
+          "bytes": 24,
+          "elements": 6,
+          "range": [
+            0.01,
+            0.5
+          ],
+          "value": null,
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "dx",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "dx.bin",
+          "dtype": "float32",
+          "shape": [
+            4,
+            6,
+            8
+          ],
+          "bytes": 768,
+          "elements": 192,
+          "rtol": 0.0001,
+          "atol": 0.0001,
+          "tol": 0.0001
+        }
+      ]
+    },
+    {
+      "name": "update",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "update.bin",
+          "dtype": "float32",
+          "shape": [
+            4,
+            6,
+            8
+          ],
+          "bytes": 768,
+          "elements": 192,
+          "rtol": 0.0001,
+          "atol": 0.0001,
+          "tol": 0.0001
+        }
+      ]
+    }
+  ]
+}
