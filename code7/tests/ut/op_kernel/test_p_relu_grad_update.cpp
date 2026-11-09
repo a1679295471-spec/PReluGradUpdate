@@ -60,8 +60,12 @@ static TilingInfo MakeTiling(int64_t total, int64_t channelNum, int64_t innerSiz
     constexpr int64_t RESERVED_UB_BYTES = 8192;
     constexpr int64_t FLOAT_TEMP_BYTES = 20;
     constexpr int64_t DOUBLE_BUFFER_FACTOR = 8;
-    constexpr int64_t UB_SIZE = 262144;
-    constexpr int64_t CORE_NUM = 64;
+    // Ascend910B1 has 192 KB of UB and far fewer than 64 AI vector cores.
+    // tikicpulib rejects a launch whose blockDim exceeds the SoC limit, and
+    // InitBuffer aborts as soon as the tiling over-commits the UB, so both
+    // constants have to match the simulated device.
+    constexpr int64_t UB_SIZE = 196608;
+    constexpr int64_t CORE_NUM = 16;
 
     const int64_t alignElems = 32 / typeSize;
     const int64_t bytesPerElem = DOUBLE_BUFFER_FACTOR * typeSize + FLOAT_TEMP_BYTES;
