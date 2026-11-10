@@ -18,6 +18,10 @@
  *   - bf16 is widened only with the vector Cast API (CAST_NONE); the scalar
  *     unit is never asked to convert bf16, which avoids the bisheng backend
  *     "not support bf16 type cast" error.
+ *   - Unchanged int8 var rows are copied directly in UB; no Cast is needed.
+ *   - fp32 -> int8 is a two-step conversion: fp32 -> half (CAST_RINT), then
+ *     half -> int8 (CAST_RINT).  CANN 9.0.0 does not expose a direct
+ *     float -> int8 vconv overload.
  */
 
 #ifndef QUANTUPDATESCATTER_H
@@ -79,7 +83,7 @@ private:
     TBuf<QuePosition::VECCALC> scaleF32Buf;
     TBuf<QuePosition::VECCALC> zpF32Buf;
     TBuf<QuePosition::VECCALC> oneBuf;
-    TBuf<QuePosition::VECCALC> varHalfBuf;
+    TBuf<QuePosition::VECCALC> outHalfBuf;
 
     GlobalTensor<int8_t> varGm;
     GlobalTensor<IDX_T> indicesGm;
@@ -169,7 +173,7 @@ __aicore__ inline void QuantUpdateScatter<T, IDX_T, SCALE_T, ZP_T>::Init(
     pipe.InitBuffer(scaleF32Buf, tileBytesF);
     pipe.InitBuffer(zpF32Buf, tileBytesF);
     pipe.InitBuffer(oneBuf, tileBytesF);
-    pipe.InitBuffer(varHalfBuf, tileBytesH);
+    pipe.InitBuffer(outHalfBuf, tileBytesH);
     ready = true;
 }
 
@@ -231,20 +235,14 @@ __aicore__ inline void QuantUpdateScatter<T, IDX_T, SCALE_T, ZP_T>::CopyVarRow(
     DataCopyExtParams inParams{1, static_cast<uint32_t>(count), 0, 0, 0};
     DataCopyPadExtParams<int8_t> padParams{false, 0, 0, 0};
     DataCopyPad(varLocal, varGm[srcOffset], inParams, padParams);
-    varInQueue.EnQue(varLocal);
-    varLocal = varInQueue.DeQue<int8_t>();
 
-    LocalTensor<half> varHalf = varHalfBuf.Get<half>();
-    LocalTensor<int8_t> outLocal = outQueue.AllocTensor<int8_t>();
-    Cast(varHalf, varLocal, RoundMode::CAST_NONE, count);
-    Cast(outLocal, varHalf, RoundMode::CAST_RINT, count);
-    outQueue.EnQue(outLocal);
-    varInQueue.FreeTensor(varLocal);
-
-    outLocal = outQueue.DeQue<int8_t>();
+    // This row is not updated; copy the int8 bytes through UB unchanged.
+    // Avoid the redundant int8 -> half -> int8 round trip here.
+    SetFlag<HardEvent::MTE2_MTE3>(EVENT_ID0);
+    WaitFlag<HardEvent::MTE2_MTE3>(EVENT_ID0);
     DataCopyExtParams outParams{1, static_cast<uint32_t>(count), 0, 0, 0};
-    DataCopyPad(outGm[dstOffset], outLocal, outParams);
-    outQueue.FreeTensor(outLocal);
+    DataCopyPad(outGm[dstOffset], varLocal, outParams);
+    varInQueue.FreeTensor(varLocal);
 }
 
 template <typename T, typename IDX_T, typename SCALE_T, typename ZP_T>
@@ -274,8 +272,12 @@ __aicore__ inline void QuantUpdateScatter<T, IDX_T, SCALE_T, ZP_T>::ComputeUpdat
     Mins(value, value, 127.0f, count);
     Maxs(value, value, -128.0f, count);
 
+    // CANN 9.0.0 has no direct float -> int8 vconv overload.  Round to half
+    // first, then narrow the half tensor to int8.
+    LocalTensor<half> outHalf = outHalfBuf.Get<half>();
+    Cast(outHalf, value, RoundMode::CAST_RINT, count);
     LocalTensor<int8_t> outLocal = outQueue.AllocTensor<int8_t>();
-    Cast(outLocal, value, RoundMode::CAST_RINT, count);
+    Cast(outLocal, outHalf, RoundMode::CAST_RINT, count);
     outQueue.EnQue(outLocal);
     outLocal = outQueue.DeQue<int8_t>();
     DataCopyExtParams outParams{1, static_cast<uint32_t>(count), 0, 0, 0};

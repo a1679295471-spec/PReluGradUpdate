@@ -94,9 +94,13 @@ def check_bf16_casts():
         return fail("bf16 input is read through the scalar unit")
     if text.count("RoundMode::CAST_NONE") < 3:
         return fail("bf16 -> fp32 vector casts are missing")
-    if "Cast(outLocal, value, RoundMode::CAST_RINT, count);" not in text:
-        return fail("fp32 -> int8 RINT cast is missing")
-    print("PASS: bf16/fp16 inputs are widened by vector Cast; fp32 -> int8 uses CAST_RINT")
+    if "Cast(outHalf, value, RoundMode::CAST_RINT, count);" not in text:
+        return fail("fp32 -> half RINT cast is missing")
+    if "Cast(outLocal, outHalf, RoundMode::CAST_RINT, count);" not in text:
+        return fail("half -> int8 RINT cast is missing")
+    if "Cast(outLocal, value, RoundMode::CAST_RINT, count);" in text:
+        return fail("direct fp32 -> int8 Cast is not supported by CANN 9.0.0")
+    print("PASS: bf16/fp16 inputs are widened by vector Cast; fp32 -> half -> int8 uses CAST_RINT")
     return True
 
 
