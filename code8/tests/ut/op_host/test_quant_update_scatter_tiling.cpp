@@ -1,4 +1,5 @@
 #include <cstring>
+#include <initializer_list>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -20,11 +21,11 @@ enum class Profile { FP16 = 0, BF16 = 1 };
 struct TilingCase {
     std::string name;
     Profile profile;
-    std::vector<int64_t> varShape;
-    std::vector<int64_t> indicesShape;
-    std::vector<int64_t> updatesShape;
-    std::vector<int64_t> scalesShape;
-    std::vector<int64_t> zpShape; // empty: optional input omitted
+    std::initializer_list<int64_t> varShape;
+    std::initializer_list<int64_t> indicesShape;
+    std::initializer_list<int64_t> updatesShape;
+    std::initializer_list<int64_t> scalesShape;
+    std::initializer_list<int64_t> zpShape; // empty: optional input omitted
     int64_t axis = -2;
     int64_t quantAxis = -1;
     bool reciprocal = false;
@@ -60,7 +61,7 @@ static TilingContextPara MakePara(const TilingCase& testCase)
         {updShape, updType, FORMAT_ND},
         {scaleShape, scaleType, FORMAT_ND},
     };
-    if (!testCase.zpShape.empty()) {
+    if (testCase.zpShape.size() != 0) {
         StorageShape zpShape(testCase.zpShape, testCase.zpShape);
         inputs.emplace_back(zpShape, zpType, FORMAT_ND);
     }
