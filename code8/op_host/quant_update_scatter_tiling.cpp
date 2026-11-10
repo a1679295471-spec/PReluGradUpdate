@@ -174,9 +174,18 @@ static ge::graphStatus CheckAndFillShapes(gert::TilingContext* context,
 
     const int64_t indicesNum = indicesShape.GetDim(0);
     const int64_t updDim0 = updatesShape.GetDim(0);
-    OP_CHECK_IF(indicesNum != updDim0,
-                OP_LOGE(context, "indices length must equal updates.shape[0]"),
-                return ge::GRAPH_FAILED);
+    if (rank == 2) {
+        // Rank-2 axis=0: updates.shape[0] is the update block length, while
+        // indices.shape[0] is the number of starting positions.  A block may
+        // be longer than the number of indices, so equality is not required.
+        OP_CHECK_IF(indicesNum > updDim0,
+                    OP_LOGE(context, "indices length must not exceed updates.shape[0] for rank-2"),
+                    return ge::GRAPH_FAILED);
+    } else {
+        OP_CHECK_IF(indicesNum != updDim0,
+                    OP_LOGE(context, "indices length must equal updates.shape[0]"),
+                    return ge::GRAPH_FAILED);
+    }
 
     const int64_t rowLen = updatesShape.GetDim(rank - 1);
     const int64_t scalesNum = scalesShape.GetShapeSize();
