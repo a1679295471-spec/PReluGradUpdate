@@ -9,6 +9,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -24,20 +25,37 @@ using namespace gert;
 
 static const std::string OP_NAME = "StridedSliceGrad";
 
-static gert::Shape ToShape(const std::vector<int64_t>& dims)
-{
-    gert::Shape shape;
-    shape.SetDimNum(dims.size());
-    for (size_t i = 0; i < dims.size(); ++i) {
-        shape.SetDim(i, dims[i]);
-    }
-    return shape;
-}
-
 static gert::StorageShape ToStorage(const std::vector<int64_t>& dims)
 {
-    const gert::Shape shape = ToShape(dims);
-    return gert::StorageShape(shape, shape);
+    // CANN 9.0.0 only exposes the two-initializer_list constructor for
+    // StorageShape; the (Shape, Shape) overload does not exist. Dispatch on
+    // rank so every supported rank still uses that exact overload.
+    const int64_t* p = dims.data();
+    switch (dims.size()) {
+        case 0:
+            return gert::StorageShape({}, {});
+        case 1:
+            return gert::StorageShape({p[0]}, {p[0]});
+        case 2:
+            return gert::StorageShape({p[0], p[1]}, {p[0], p[1]});
+        case 3:
+            return gert::StorageShape({p[0], p[1], p[2]}, {p[0], p[1], p[2]});
+        case 4:
+            return gert::StorageShape({p[0], p[1], p[2], p[3]}, {p[0], p[1], p[2], p[3]});
+        case 5:
+            return gert::StorageShape({p[0], p[1], p[2], p[3], p[4]}, {p[0], p[1], p[2], p[3], p[4]});
+        case 6:
+            return gert::StorageShape({p[0], p[1], p[2], p[3], p[4], p[5]},
+                                      {p[0], p[1], p[2], p[3], p[4], p[5]});
+        case 7:
+            return gert::StorageShape({p[0], p[1], p[2], p[3], p[4], p[5], p[6]},
+                                      {p[0], p[1], p[2], p[3], p[4], p[5], p[6]});
+        case 8:
+            return gert::StorageShape({p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]},
+                                      {p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]});
+        default:
+            throw std::runtime_error("StridedSliceGrad UT: unsupported rank");
+    }
 }
 
 static int64_t Product(const std::vector<int64_t>& dims)
