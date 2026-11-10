@@ -25,6 +25,11 @@ using namespace gert;
 
 static const std::string OP_NAME = "StridedSliceGrad";
 
+// TilingParse is registered with this compile-info type; the UT harness copies
+// it into the tiling context, so it must point at a real object (nullptr faults).
+struct StridedSliceGradCompileInfo {};
+static StridedSliceGradCompileInfo compileInfo;
+
 static gert::StorageShape ToStorage(const std::vector<int64_t>& dims)
 {
     // CANN 9.0.0 only exposes the two-initializer_list constructor for
@@ -113,7 +118,7 @@ static TilingContextPara MakePara(const TilingCase& c)
         {"new_axis_mask", Ops::Math::AnyValue::CreateFrom<int64_t>(c.newAxisMask)},
         {"shrink_axis_mask", Ops::Math::AnyValue::CreateFrom<int64_t>(c.shrinkAxisMask)},
     };
-    return TilingContextPara(OP_NAME, inputs, outputs, attrs, nullptr, 64, 196608, 4096);
+    return TilingContextPara(OP_NAME, inputs, outputs, attrs, &compileInfo, 64, 196608, 4096);
 }
 
 static void RunSuccess(const TilingCase& c)
