@@ -13,6 +13,9 @@
 #     Do not use `source setup_env.sh`: the installer and `yes | ...` pipeline
 #     must run in child processes, and a source made inside this script cannot
 #     modify the shell that launched it.
+#   * pip3 is a hard prerequisite for the CANN ge-compiler subpackage. If it is
+#     missing, this script tries to install python3-pip and aborts with manual
+#     instructions if that is not possible.
 #
 set -euo pipefail
 
@@ -222,6 +225,37 @@ setup_googletest() {
     return 0
 }
 
+ensure_pip3() {
+    if command -v pip3 >/dev/null 2>&1; then
+        if pip3 --version >/dev/null 2>&1; then
+            log "pip3 found: $(command -v pip3)"
+            return 0
+        fi
+        die "pip3 exists at $(command -v pip3) but cannot run. Repair the Python 3 pip installation, then rerun: bash setup_env.sh"
+    fi
+
+    warn "pip3 is required by the CANN ge-compiler subpackage, but it is not installed."
+    warn "Attempting: apt-get update && apt-get install -y python3-pip"
+
+    local apt_log="${INSTALL_LOG_DIR}/apt_python3_pip.log"
+    mkdir -p "$INSTALL_LOG_DIR"
+    as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y >"$apt_log" 2>&1 \
+        || warn "apt-get update failed; trying apt-get install anyway."
+
+    if ! as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y python3-pip >>"$apt_log" 2>&1; then
+        tail -n 60 "$apt_log" >&2 || true
+        die "Could not install pip3 automatically. pip3 is required by the CANN ge-compiler subpackage. Install it manually (as root: apt-get update && apt-get install -y python3-pip, or with sudo), then rerun: bash setup_env.sh"
+    fi
+
+    hash -r 2>/dev/null || true
+    if ! command -v pip3 >/dev/null 2>&1 || ! pip3 --version >/dev/null 2>&1; then
+        tail -n 60 "$apt_log" >&2 || true
+        die "python3-pip was installed but pip3 is still not usable. Check PATH and the apt log, then rerun: bash setup_env.sh"
+    fi
+    log "pip3 installed: $(command -v pip3)"
+    return 0
+}
+
 # ---------------------------------------------------------------------------
 # 0. Basic environment checks
 # ---------------------------------------------------------------------------
@@ -255,6 +289,8 @@ fi
 
 mkdir -p "$PKG_DIR" "$INSTALL_LOG_DIR"
 export DEBIAN_FRONTEND=noninteractive
+
+ensure_pip3
 
 # ---------------------------------------------------------------------------
 # 1. Download and install the two CANN 9.0.0 packages
