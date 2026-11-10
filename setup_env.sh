@@ -31,6 +31,7 @@ GTEST_SRC_DIR="${GTEST_SOURCE_DIR:-/usr/src/googletest}"
 PKG_DIR="${CANN_PKG_DIR:-${HOME}/cann_installers}"
 INSTALL_LOG_DIR="${PKG_DIR}/logs"
 MIN_PKG_BYTES=$((100 * 1024 * 1024))
+CANN_INSTALL_PATH="${CANN_INSTALL_PATH:-}"
 
 log()  { printf '\n[INFO] %s\n' "$*"; }
 warn() { printf '\n[WARN] %s\n' "$*" >&2; }
@@ -43,6 +44,14 @@ as_root() {
         sudo -n "$@"
     else
         return 1
+    fi
+}
+
+run_installer_cmd() {
+    if [ "$ROOT_INSTALL" -eq 1 ] && [ "$(id -u)" -ne 0 ]; then
+        sudo -n bash "$@"
+    else
+        bash "$@"
     fi
 }
 
@@ -101,7 +110,7 @@ install_cann_package() {
     # `yes` process receives SIGPIPE when the installer stops reading, so
     # pipefail must be disabled around this pipeline.
     set +o pipefail
-    if ! yes | as_root bash "$pkg" --install >"$log_file" 2>&1; then
+    if ! yes | run_installer_cmd "$pkg" "${INSTALL_ARGS[@]}" >"$log_file" 2>&1; then
         set -o pipefail
         warn "${label} installer returned a non-zero status. Last log lines:"
         tail -n 80 "$log_file" >&2 || true
@@ -222,9 +231,26 @@ if [ "$ARCH" != "aarch64" ] && [ "$ARCH" != "arm64" ]; then
 fi
 log "Architecture: ${ARCH}"
 
-if [ "$(id -u)" -ne 0 ] && ! { command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; }; then
+ROOT_INSTALL=0
+if [ "$(id -u)" -eq 0 ]; then
+    ROOT_INSTALL=1
+elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+    ROOT_INSTALL=1
+else
     warn "Not running as root and passwordless sudo is unavailable."
-    warn "The CANN installer and apt fallbacks may fail. Run as root, or configure passwordless sudo."
+    if [ -z "$CANN_INSTALL_PATH" ]; then
+        CANN_INSTALL_PATH="${HOME}/Ascend"
+        warn "Installing CANN under the user-writable path ${CANN_INSTALL_PATH} instead of /usr/local/Ascend."
+    fi
+    warn "apt-get fallbacks may still fail without root; CANN itself will be installed as the current user."
+fi
+
+INSTALL_ARGS=(--install)
+if [ -n "$CANN_INSTALL_PATH" ]; then
+    INSTALL_ARGS+=(--install-path "$CANN_INSTALL_PATH")
+    log "CANN install path: ${CANN_INSTALL_PATH}"
+else
+    log "CANN install path: installer default (usually /usr/local/Ascend)"
 fi
 
 mkdir -p "$PKG_DIR" "$INSTALL_LOG_DIR"
@@ -384,6 +410,7 @@ fi
 printf '\n'
 printf '================ SETUP SUMMARY ================\n'
 printf 'CANN version          : %s\n' "$CANN_VERSION"
+printf 'CANN install path     : %s\n' "${CANN_INSTALL_PATH:-<installer default>}"
 printf 'ASCEND_HOME_PATH      : %s\n' "${ASCEND_HOME_PATH:-<unset>}"
 printf 'set_env.sh            : %s\n' "$SELECTED_SET_ENV"
 printf 'nlohmann json.hpp     : %s\n' "${JSON_PATH:-<missing>}"
