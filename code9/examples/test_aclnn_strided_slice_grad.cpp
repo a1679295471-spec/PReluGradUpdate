@@ -10,7 +10,12 @@ int main(int argc, char** argv) {
         aclrtStream stream;
         check(aclrtCreateStream(&stream));
         {
-            Tensor input_0_0({4}, ACL_INT32, 16, "shape.bin", true, false, root);
+            // CANN 9.0's aclnn generator exposes a ValueDepend 1-D integer
+            // input (`shape`) as aclIntArray, not aclTensor.
+            const int64_t shapeValues[] = {2, 4, 5, 6};
+            aclIntArray* shape = aclCreateIntArray(shapeValues, 4);
+            if (shape == nullptr)
+                throw std::runtime_error("shape array creation failed");
             Tensor input_1_0({4}, ACL_INT32, 16, "begin.bin", true, false, root);
             Tensor input_2_0({4}, ACL_INT32, 16, "end.bin", true, false, root);
             Tensor input_3_0({4}, ACL_INT32, 16, "strides.bin", true, false, root);
@@ -24,7 +29,7 @@ int main(int argc, char** argv) {
             uint64_t size = 0;
             aclOpExecutor* executor = nullptr;
             check(aclnnStridedSliceGradGetWorkspaceSize(
-                input_0_0.tensor,
+                shape,
                 input_1_0.tensor,
                 input_2_0.tensor,
                 input_3_0.tensor,
@@ -45,6 +50,7 @@ int main(int argc, char** argv) {
             output_0_0.save(root);
             if (workspace)
                 check(aclrtFree(workspace));
+            aclDestroyIntArray(shape);
         }
         check(aclrtDestroyStream(stream));
         check(aclrtResetDevice(device));
