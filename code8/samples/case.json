@@ -1,0 +1,211 @@
+{
+  "source_case": "npu_cases[0]",
+  "function": "impl",
+  "attributes": {
+    "reduce": "update",
+    "axis": -2,
+    "quant_axis": -1,
+    "reciprocal_scale": false
+  },
+  "inputs": [
+    {
+      "name": "var",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "var.bin",
+          "dtype": "int8",
+          "shape": [
+            1,
+            2,
+            32
+          ],
+          "bytes": 64,
+          "elements": 64,
+          "range": [
+            -128,
+            127
+          ],
+          "value": null,
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "indices",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "indices.bin",
+          "dtype": "int32",
+          "shape": [
+            1
+          ],
+          "bytes": 4,
+          "elements": 1,
+          "range": null,
+          "value": [
+            0
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "updates",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "updates.bin",
+          "dtype": "float16",
+          "shape": [
+            1,
+            1,
+            32
+          ],
+          "bytes": 64,
+          "elements": 32,
+          "range": [
+            -10,
+            10
+          ],
+          "value": null,
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "quant_scales",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "quant_scales.bin",
+          "dtype": "float32",
+          "shape": [
+            1,
+            1,
+            32
+          ],
+          "bytes": 128,
+          "elements": 32,
+          "range": null,
+          "value": [
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0,
+            0.5,
+            1.0,
+            2.0,
+            4.0
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "quant_zero_points",
+      "kind": "optional",
+      "tensors": [
+        {
+          "file": "quant_zero_points.bin",
+          "dtype": "int32",
+          "shape": [
+            1,
+            1,
+            32
+          ],
+          "bytes": 128,
+          "elements": 32,
+          "range": null,
+          "value": [
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            -2,
+            -1,
+            0,
+            1,
+            2,
+            -2,
+            -1
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "var_out",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "var_out.bin",
+          "dtype": "int8",
+          "shape": [
+            1,
+            2,
+            32
+          ],
+          "bytes": 64,
+          "elements": 64,
+          "rtol": 0,
+          "atol": 0,
+          "tol": 0
+        }
+      ]
+    }
+  ]
+}
