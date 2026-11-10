@@ -1,0 +1,13 @@
+build/
+build_out/
+build-*/
+*/build/
+examples/build/
+tests/ut/build/
+samples/build/
+samples/build-npu/
+__pycache__/
+*.pyc
+*.o
+*.so
+*.run

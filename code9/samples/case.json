@@ -1,0 +1,157 @@
+{
+  "source_case": "npu_cases[0]",
+  "function": "impl",
+  "attributes": {
+    "begin_mask": 0,
+    "end_mask": 0,
+    "ellipsis_mask": 0,
+    "new_axis_mask": 0,
+    "shrink_axis_mask": 0
+  },
+  "inputs": [
+    {
+      "name": "shape",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "shape.bin",
+          "dtype": "int32",
+          "shape": [
+            4
+          ],
+          "bytes": 16,
+          "elements": 4,
+          "range": null,
+          "value": [
+            2,
+            4,
+            5,
+            6
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "begin",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "begin.bin",
+          "dtype": "int32",
+          "shape": [
+            4
+          ],
+          "bytes": 16,
+          "elements": 4,
+          "range": null,
+          "value": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "end",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "end.bin",
+          "dtype": "int32",
+          "shape": [
+            4
+          ],
+          "bytes": 16,
+          "elements": 4,
+          "range": null,
+          "value": [
+            2,
+            4,
+            5,
+            6
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "strides",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "strides.bin",
+          "dtype": "int32",
+          "shape": [
+            4
+          ],
+          "bytes": 16,
+          "elements": 4,
+          "range": null,
+          "value": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    },
+    {
+      "name": "dy",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "dy.bin",
+          "dtype": "float32",
+          "shape": [
+            2,
+            3,
+            5,
+            6
+          ],
+          "bytes": 720,
+          "elements": 180,
+          "range": [
+            -10,
+            10
+          ],
+          "value": null,
+          "value_url": null,
+          "value_sha256": null
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "y",
+      "kind": "required",
+      "tensors": [
+        {
+          "file": "y.bin",
+          "dtype": "float32",
+          "shape": [
+            2,
+            4,
+            5,
+            6
+          ],
+          "bytes": 960,
+          "elements": 240,
+          "rtol": 0.0001,
+          "atol": 0.0001,
+          "tol": 0.0001
+        }
+      ]
+    }
+  ]
+}
